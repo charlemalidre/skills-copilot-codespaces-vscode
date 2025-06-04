@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Haiti Web Clock</title>
+    <style>
+body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+h1 {
+    color: #007bff;
+}
+
+h2 {
+    color: #555;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 5px;
+    margin-top: 30px;
+}
+
+#clock-container,
+#alarm-container,
+#timer-container,
+#stopwatch-container {
+    background-color: #fff;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    width: 350px;
+    text-align: center;
+}
+
+#clock {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #28a745;
+    margin: 10px 0;
+}
+
+input[type="time"],
+input[type="number"] {
+    padding: 8px;
+    margin: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em;
+}
+
+button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    margin: 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+#clear-alarm {
+    background-color: #dc3545;
+}
+#clear-alarm:hover {
+    background-color: #c82333;
+}
+
+#pause-timer,
+#pause-stopwatch {
+    background-color: #ffc107;
+    color: #333;
+}
+#pause-timer:hover,
+#pause-stopwatch:hover {
+    background-color: #e0a800;
+}
+
+
+#reset-timer,
+#reset-stopwatch {
+    background-color: #6c757d;
+}
+#reset-timer:hover,
+#reset-stopwatch:hover {
+    background-color: #5a6268;
+}
+
+
+#timer-display,
+#stopwatch-display {
+    font-size: 2em;
+    font-weight: bold;
+    margin: 10px 0;
+    color: #17a2b8;
+}
+
+#laps-list {
+    list-style-type: none;
+    padding: 0;
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    margin-top: 10px;
+}
+
+#laps-list li {
+    padding: 5px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+#laps-list li:last-child {
+    border-bottom: none;
+}
+    </style>
+</head>
+<body>
+    <h1>Haiti Web Clock</h1>
+
+    <div id="clock-container">
+        <h2>Current Time in Haiti</h2>
+        <div id="clock"></div>
+    </div>
+
+    <div id="alarm-container">
+        <h2>Alarm</h2>
+        <input type="time" id="alarm-time">
+        <button id="set-alarm">Set Alarm</button>
+        <button id="clear-alarm" style="display:none;">Clear Alarm</button>
+    </div>
+
+    <div id="timer-container">
+        <h2>Timer</h2>
+        <div>
+            <input type="number" id="timer-minutes" placeholder="Minutes" min="0">
+            <input type="number" id="timer-seconds" placeholder="Seconds" min="0" max="59">
+        </div>
+        <button id="start-timer">Start Timer</button>
+        <button id="pause-timer">Pause Timer</button>
+        <button id="reset-timer">Reset Timer</button>
+        <div id="timer-display">00:00</div>
+    </div>
+
+    <div id="stopwatch-container">
+        <h2>Stopwatch</h2>
+        <div id="stopwatch-display">00:00:00.000</div>
+        <button id="start-stopwatch">Start</button>
+        <button id="pause-stopwatch">Pause</button>
+        <button id="reset-stopwatch">Reset</button>
+        <button id="lap-stopwatch">Lap</button>
+        <ul id="laps-list"></ul>
+    </div>
+
+    <script>
+// Clock Functionality
+const clockElement = document.getElementById('clock');
+
+function updateClock() {
+    try {
+        const now = new Date();
+        // Haiti is in 'America/Port-au-Prince' timezone
+        const options = { timeZone: 'America/Port-au-Prince', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+        const haitiTime = now.toLocaleTimeString('en-US', options);
+        clockElement.textContent = haitiTime;
+    } catch (error) {
+        console.error("Error updating clock:", error);
+        clockElement.textContent = "Error loading time";
+        // Fallback if Intl or timezone is not supported in a very old browser
+        // This is a rough fallback and might not be accurate for Haiti time
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        clockElement.textContent = `${hours}:${minutes}:${seconds} (Fallback - May not be Haiti Time)`;
+    }
+}
+
+// Update the clock every second
+setInterval(updateClock, 1000);
+
+// Initial call to display clock immediately
+updateClock();
+
+// --- ALARM FUNCTIONALITY ---
+const alarmTimeInput = document.getElementById('alarm-time');
+const setAlarmButton = document.getElementById('set-alarm');
+const clearAlarmButton = document.getElementById('clear-alarm');
+
+// --- Web Audio API for Sound ---
+let audioContext; // Declare here to be accessible by playAlarmSound
+
+function getAudioContext() {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioContext;
+}
+
+function playAlarmSound() {
+    try {
+        const context = getAudioContext();
+        if (!context) {
+            console.warn("Web Audio API not supported. No sound will play.");
+            return;
+        }
+        const oscillator = context.createOscillator();
+        const gainNode = context.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(context.destination);
+
+        oscillator.type = 'sine'; // 'sine', 'square', 'sawtooth', 'triangle'
+        oscillator.frequency.setValueAtTime(440, context.currentTime); // A4 note
+        gainNode.gain.setValueAtTime(0.5, context.currentTime); // Volume
+
+        oscillator.start(context.currentTime);
+        // Beep for 0.5 seconds
+        oscillator.stop(context.currentTime + 0.5);
+        console.log("Beep sound played via Web Audio API.");
+    } catch (error) {
+        console.error("Error playing sound with Web Audio API:", error);
+    }
+}
+
+function stopAlarmSound() {
+    // No action needed for short Web Audio beeps
+    console.log("stopAlarmSound called (no action for Web Audio beep).");
+}
+
+let alarmIntervalId = null;
+let scheduledAlarmTime = null;
+
+function checkAlarm() {
+    if (!scheduledAlarmTime) return;
+
+    const now = new Date();
+    const currentHours = String(now.getHours()).padStart(2, '0');
+    const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+    const currentTimeString = `${currentHours}:${currentMinutes}`;
+
+    if (currentTimeString === scheduledAlarmTime) {
+        playAlarmSound();
+        alert('Alarm! Time to wake up!');
+        clearAlarm();
+    }
+}
+
+function setAlarm() {
+    const timeValue = alarmTimeInput.value;
+    if (!timeValue) {
+        alert("Please set a time for the alarm.");
+        return;
+    }
+
+    scheduledAlarmTime = timeValue;
+    console.log(`Alarm set for: ${scheduledAlarmTime}`);
+
+    if (alarmIntervalId) {
+        clearInterval(alarmIntervalId);
+    }
+    alarmIntervalId = setInterval(checkAlarm, 1000);
+
+    setAlarmButton.style.display = 'none';
+    clearAlarmButton.style.display = 'inline-block';
+    alarmTimeInput.disabled = true;
+}
+
+function clearAlarm() {
+    if (alarmIntervalId) {
+        clearInterval(alarmIntervalId);
+        alarmIntervalId = null;
+    }
+    stopAlarmSound();
+    scheduledAlarmTime = null;
+    alarmTimeInput.value = "";
+    alarmTimeInput.disabled = false;
+    setAlarmButton.style.display = 'inline-block';
+    clearAlarmButton.style.display = 'none';
+    console.log("Alarm cleared.");
+}
+
+setAlarmButton.addEventListener('click', setAlarm);
+clearAlarmButton.addEventListener('click', clearAlarm);
+
+console.log("Alarm functionality loaded.");
+
+// --- TIMER FUNCTIONALITY ---
+const timerMinutesInput = document.getElementById('timer-minutes');
+const timerSecondsInput = document.getElementById('timer-seconds');
+const startTimerButton = document.getElementById('start-timer');
+const pauseTimerButton = document.getElementById('pause-timer');
+const resetTimerButton = document.getElementById('reset-timer');
+const timerDisplay = document.getElementById('timer-display');
+
+let timerIntervalId = null;
+let timerTotalSeconds = 0;
+let timerRemainingSeconds = 0;
+let isTimerPaused = false;
+
+function formatTime(totalSeconds) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function updateTimerDisplay() {
+    timerDisplay.textContent = formatTime(timerRemainingSeconds);
+}
+
+function startTimer() {
+    if (isTimerPaused) {
+        isTimerPaused = false;
+    } else {
+        const minutes = parseInt(timerMinutesInput.value) || 0;
+        const seconds = parseInt(timerSecondsInput.value) || 0;
+        timerTotalSeconds = (minutes * 60) + seconds;
+
+        if (timerTotalSeconds <= 0) {
+            alert("Please set a valid duration for the timer.");
+            return;
+        }
+        timerRemainingSeconds = timerTotalSeconds;
+    }
+
+    if (timerRemainingSeconds <= 0) return;
+
+    updateTimerDisplay();
+
+    if (timerIntervalId) {
+        clearInterval(timerIntervalId);
+    }
+
+    timerIntervalId = setInterval(() => {
+        timerRemainingSeconds--;
+        updateTimerDisplay();
+
+        if (timerRemainingSeconds <= 0) {
+            clearInterval(timerIntervalId);
+            timerIntervalId = null;
+            playAlarmSound();
+            alert("Timer Finished!");
+            resetTimerControls(true);
+        }
+    }, 1000);
+
+    timerMinutesInput.disabled = true;
+    timerSecondsInput.disabled = true;
+    startTimerButton.disabled = true;
+    pauseTimerButton.disabled = false;
+    resetTimerButton.disabled = false;
+}
+
+function pauseTimer() {
+    if (timerIntervalId) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null;
+        isTimerPaused = true;
+        startTimerButton.disabled = false;
+        startTimerButton.textContent = "Resume Timer";
+        pauseTimerButton.disabled = true;
+    }
+}
+
+function resetTimerControls(isFinished) {
+    timerMinutesInput.disabled = false;
+    timerSecondsInput.disabled = false;
+    startTimerButton.disabled = false;
+    startTimerButton.textContent = "Start Timer";
+    pauseTimerButton.disabled = true;
+    resetTimerButton.disabled = !(timerTotalSeconds > 0 || isFinished);
+}
+
+
+function resetTimer() {
+    if (timerIntervalId) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null;
+    }
+    isTimerPaused = false;
+    timerTotalSeconds = 0;
+    timerRemainingSeconds = 0;
+    updateTimerDisplay();
+
+    timerMinutesInput.value = "";
+    timerSecondsInput.value = "";
+
+    resetTimerControls(false);
+    console.log("Timer reset.");
+}
+
+startTimerButton.addEventListener('click', startTimer);
+pauseTimerButton.addEventListener('click', pauseTimer);
+resetTimerButton.addEventListener('click', resetTimer);
+
+pauseTimerButton.disabled = true;
+resetTimerButton.disabled = true;
+
+console.log("Timer functionality loaded.");
+
+// --- STOPWATCH FUNCTIONALITY ---
+const stopwatchDisplay = document.getElementById('stopwatch-display');
+const startStopwatchButton = document.getElementById('start-stopwatch');
+const pauseStopwatchButton = document.getElementById('pause-stopwatch');
+const resetStopwatchButton = document.getElementById('reset-stopwatch');
+const lapStopwatchButton = document.getElementById('lap-stopwatch');
+const lapsList = document.getElementById('laps-list');
+
+let stopwatchIntervalId = null;
+let stopwatchStartTime = 0;
+let stopwatchElapsedTime = 0;
+let isStopwatchPaused = false;
+
+function formatStopwatchTime(timeInMilliseconds) {
+    const totalMilliseconds = timeInMilliseconds;
+    const milliseconds = String(totalMilliseconds % 1000).padStart(3, '0');
+    const totalSeconds = Math.floor(totalMilliseconds / 1000);
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    const minutes = String(Math.floor(totalSeconds / 60) % 60).padStart(2, '0');
+    return `${minutes}:${seconds}.${milliseconds}`;
+}
+
+function updateStopwatchDisplay() {
+    const currentTime = Date.now();
+    const displayTime = stopwatchElapsedTime + (stopwatchStartTime ? (currentTime - stopwatchStartTime) : 0);
+    stopwatchDisplay.textContent = formatStopwatchTime(displayTime);
+}
+
+function startStopwatch() {
+    if (isStopwatchPaused) {
+        isStopwatchPaused = false;
+    } else {
+        stopwatchElapsedTime = 0;
+    }
+
+    stopwatchStartTime = Date.now();
+
+    if (stopwatchIntervalId) {
+        clearInterval(stopwatchIntervalId);
+    }
+
+    stopwatchIntervalId = setInterval(updateStopwatchDisplay, 10);
+
+    startStopwatchButton.textContent = "Start";
+    startStopwatchButton.disabled = true;
+    pauseStopwatchButton.disabled = false;
+    resetStopwatchButton.disabled = false;
+    lapStopwatchButton.disabled = false;
+}
+
+function pauseStopwatch() {
+    if (stopwatchIntervalId) {
+        clearInterval(stopwatchIntervalId);
+        stopwatchIntervalId = null;
+        stopwatchElapsedTime += (Date.now() - stopwatchStartTime);
+        stopwatchStartTime = 0;
+        isStopwatchPaused = true;
+
+        startStopwatchButton.textContent = "Resume";
+        startStopwatchButton.disabled = false;
+        pauseStopwatchButton.disabled = true;
+        lapStopwatchButton.disabled = true;
+    }
+}
+
+function resetStopwatch() {
+    if (stopwatchIntervalId) {
+        clearInterval(stopwatchIntervalId);
+        stopwatchIntervalId = null;
+    }
+    isStopwatchPaused = false;
+    stopwatchStartTime = 0;
+    stopwatchElapsedTime = 0;
+    stopwatchDisplay.textContent = formatStopwatchTime(0);
+    lapsList.innerHTML = '';
+
+    startStopwatchButton.textContent = "Start";
+    startStopwatchButton.disabled = false;
+    pauseStopwatchButton.disabled = true;
+    resetStopwatchButton.disabled = true;
+    lapStopwatchButton.disabled = true;
+    console.log("Stopwatch reset.");
+}
+
+function lapStopwatch() {
+    if (!stopwatchIntervalId && !isStopwatchPaused) return;
+
+    const currentTime = Date.now();
+    const lapTimeValue = stopwatchElapsedTime + (stopwatchStartTime ? (currentTime - stopwatchStartTime) : 0);
+    const lapTimeFormatted = formatStopwatchTime(lapTimeValue);
+
+    const lapItem = document.createElement('li');
+    lapItem.textContent = `Lap ${lapsList.children.length + 1}: ${lapTimeFormatted}`;
+    lapsList.prepend(lapItem);
+}
+
+startStopwatchButton.addEventListener('click', startStopwatch);
+pauseStopwatchButton.addEventListener('click', pauseStopwatch);
+resetStopwatchButton.addEventListener('click', resetStopwatch);
+lapStopwatchButton.addEventListener('click', lapStopwatch);
+
+pauseStopwatchButton.disabled = true;
+resetStopwatchButton.disabled = true;
+lapStopwatchButton.disabled = true;
+
+console.log("Stopwatch functionality loaded.");
+    </script>
+</body>
+</html>
