@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Haiti Web Clock</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Haiti Web Clock</h1>
+
+    <div id="clock-container">
+        <h2>Current Time in Haiti</h2>
+        <div id="clock"></div>
+    </div>
+
+    <div id="alarm-container">
+        <h2>Alarm</h2>
+        <input type="time" id="alarm-time">
+        <button id="set-alarm">Set Alarm</button>
+        <button id="clear-alarm" style="display:none;">Clear Alarm</button>
+    </div>
+
+    <div id="timer-container">
+        <h2>Timer</h2>
+        <div>
+            <input type="number" id="timer-minutes" placeholder="Minutes" min="0">
+            <input type="number" id="timer-seconds" placeholder="Seconds" min="0" max="59">
+        </div>
+        <button id="start-timer">Start Timer</button>
+        <button id="pause-timer">Pause Timer</button>
+        <button id="reset-timer">Reset Timer</button>
+        <div id="timer-display">00:00</div>
+    </div>
+
+    <div id="stopwatch-container">
+        <h2>Stopwatch</h2>
+        <div id="stopwatch-display">00:00:00.000</div>
+        <button id="start-stopwatch">Start</button>
+        <button id="pause-stopwatch">Pause</button>
+        <button id="reset-stopwatch">Reset</button>
+        <button id="lap-stopwatch">Lap</button>
+        <ul id="laps-list"></ul>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
